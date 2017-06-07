@@ -847,10 +847,19 @@ void DICOMAppHelper::PixelDataCallback( DICOMParser *,
       this->ImageDataLengthInBytes = numPixels * sizeof(short);
       short newShortPixel;
       for (int i = 0; i < numPixels; i++)
+      {
+        // Some scanners have cylindrical scanning bounds, but the output image is square.
+        // The pixels that fall outside of these bounds get the fixed value -2000.
+        // The first step is setting these values to 0, which currently corresponds to air.
+        // https://www.kaggle.com/gzuidhof/full-preprocessing-tutorial
+        short val = shortInputData[i];
+        if (val == -2000)
         {
-        newShortPixel = short(this->RescaleSlope * shortInputData[i] + this->RescaleOffset);
-        shortOutputData[i] = newShortPixel;
+          val = 0;
         }
+        newShortPixel = short(this->RescaleSlope * val + this->RescaleOffset);
+        shortOutputData[i] = newShortPixel;
+      }
 #ifdef DEBUG_DICOM_APP_HELPER
       dicom_stream::cout << "Did rescale, offset to short from short." << dicom_stream::endl;
       dicom_stream::cout << numPixels << " pixels." << dicom_stream::endl;

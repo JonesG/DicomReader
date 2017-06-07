@@ -31,10 +31,9 @@ void writePPM( std::string & strFileName, const int16_t * pBuffer, const int dim
     {
        static unsigned char color[3];
        const int32_t   iVal = pBuffer[i];
-       char cVal = static_cast<char>(((iVal - iMin) * 255) / iScale);
+       unsigned char cVal = static_cast<unsigned char>(((iVal - iMin) * 255) / iScale);
        iMinP = min(iMinP, int(cVal));
        iMaxP = max(iMaxP, int(cVal));
-       cVal += 127;
        color[0] = cVal; // red
        color[1] = cVal; // green
        color[2] = cVal; // blue
