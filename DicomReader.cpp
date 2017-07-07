@@ -24,7 +24,8 @@ void writePPM( std::string & strFileName, const int16_t * pBuffer, const int dim
 
     std::cout << "Min = " << iMin << " Max = " << iMax << "\n";
 
-    FILE *fp = fopen(strFileName.c_str(), "wb");
+    FILE *fp = NULL;
+    auto    ret = fopen_s( &fp, strFileName.c_str(), "wb" );
 
     (void)fprintf(fp, "P6\n%d %d\n255\n", dimx, dimy);
 
@@ -440,20 +441,35 @@ void ReadDir( const std::string & strDir)
                     iDestSizeY,
                     iDestSizeZ);
 
-
-    bOK = SaveVTK(  "test1.vtk",
+    bOK = WriteVTK(  "test1.vtk",
                     piBufferSrc,
                     helper.GetWidth(),
                     helper.GetHeight(),
                     uiNumSlices,
                     1.0f);
+    assert(bOK);
 
-    bOK = SaveVTK(  "test2.vtk",
+    int16_t *   piBufferSrcTest;
+    uint32_t    iX;
+    uint32_t    iY;
+    uint32_t    iZ;
+    float       fCellSize;
+    bOK = ReadVTK(  "test1.vtk",
+                    &piBufferSrcTest,
+                    iX,
+                    iY,
+                    iZ,
+                    fCellSize);
+    assert(bOK);
+    assert( memcmp(piBufferSrc, piBufferSrcTest, iX*iY*iZ*sizeof(int16_t)) == 0 );
+
+    bOK = WriteVTK(  "test2.vtk",
                     piBufferDest,
                     iDestSizeX,
                     iDestSizeY,
                     iDestSizeZ,
                     1.0f        );
+    assert(bOK);
 
     int16_t iMin = INT16_MAX;
     int16_t iMax = INT16_MIN;
