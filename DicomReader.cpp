@@ -218,11 +218,9 @@ bool GetDicom3DBuffer(  const std::string &     strDicomDir,
         return false;
     }
 
-    uint32_t    uiNumSlicesCount = 0;
-    int16_t *   piDest = piBuffer;
-
-    const uint32_t    uiPixelSize = helper.GetWidth() * helper.GetHeight();
-    const uint32_t    ui2DBufferSize = uiPixelSize * sizeof(int16_t);
+    uint32_t        uiNumSlicesCount = 0;
+    const uint32_t  uiPixelSize = helper.GetWidth() * helper.GetHeight();
+    const uint32_t  ui2DBufferSize = uiPixelSize * sizeof(int16_t);
 
     while (dir.has_next)
     {
@@ -263,8 +261,8 @@ bool GetDicom3DBuffer(  const std::string &     strDicomDir,
                 uiNumSlicesCount++;
                 assert(uiNumSlicesCount <= uiNumSlices);
 
+                int16_t *   piDest = piBuffer + (uiPixelSize * (helper.GetSliceNumber()-1));
                 memcpy( reinterpret_cast<void *>(piDest), pvBuffer, ui2DBufferSize );
-                piDest += uiPixelSize;
             }
         }
 
@@ -410,7 +408,7 @@ void ReadDir( const std::string & strDir)
                                                 fYSpacing,
                                                 fZSpacing   );
 
-    std::cout << "Spacing = ( " << fXSpacing << ", " << fYSpacing << ", " << fZSpacing << "\n";
+    std::cout << "Spacing = ( " << fXSpacing << ", " << fYSpacing << ", " << fZSpacing << " )\n";
 
     int         iSize = helper.GetWidth() *
                         helper.GetHeight() *
@@ -423,6 +421,41 @@ void ReadDir( const std::string & strDir)
                             helper,
                             piBufferSrc,
                             uiNumSlices);
+
+    bOK = WriteVTK( "test1.vtk",
+                    piBufferSrc,
+                    helper.GetWidth(),
+                    helper.GetHeight(),
+                    uiNumSlices,
+                    fXSpacing,
+                    fYSpacing,
+                    fZSpacing   );
+        assert(bOK);
+
+    int16_t *   piBufferSrcTest;
+    uint32_t    iX;
+    uint32_t    iY;
+    uint32_t    iZ;
+    float       fCellSize;
+    bOK = ReadVTK(  "test1.vtk",
+                    &piBufferSrcTest,
+                    iX,
+                    iY,
+                    iZ,
+                    fCellSize   );
+    assert(bOK);
+    assert(memcmp(piBufferSrc, piBufferSrcTest, iX*iY*iZ * sizeof(int16_t)) == 0);
+    delete[] piBufferSrcTest;
+
+    bOK = WriteVTU( "test1.vti",
+                    piBufferSrc,
+                    helper.GetWidth(),
+                    helper.GetHeight(),
+                    uiNumSlices,
+                    fXSpacing,
+                    fYSpacing,
+                    fZSpacing);
+    assert(bOK);
 
     int16_t *   piBufferDest = new int16_t[iSize];
     int         iDestSizeX = 0;
@@ -441,34 +474,14 @@ void ReadDir( const std::string & strDir)
                     iDestSizeY,
                     iDestSizeZ);
 
-    bOK = WriteVTK(  "test1.vtk",
-                    piBufferSrc,
-                    helper.GetWidth(),
-                    helper.GetHeight(),
-                    uiNumSlices,
-                    1.0f);
-    assert(bOK);
-
-    int16_t *   piBufferSrcTest;
-    uint32_t    iX;
-    uint32_t    iY;
-    uint32_t    iZ;
-    float       fCellSize;
-    bOK = ReadVTK(  "test1.vtk",
-                    &piBufferSrcTest,
-                    iX,
-                    iY,
-                    iZ,
-                    fCellSize);
-    assert(bOK);
-    assert( memcmp(piBufferSrc, piBufferSrcTest, iX*iY*iZ*sizeof(int16_t)) == 0 );
-
-    bOK = WriteVTK(  "test2.vtk",
+    bOK = WriteVTK( "test2.vtk",
                     piBufferDest,
                     iDestSizeX,
                     iDestSizeY,
                     iDestSizeZ,
-                    1.0f        );
+                    1.0f,
+                    1.0f,
+                    1.0f );
     assert(bOK);
 
     int16_t iMin = INT16_MAX;

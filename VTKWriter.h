@@ -2,13 +2,16 @@
 
 #include <fstream>
 #include <string>
+#include <base64.h>
 
 bool WriteVTK(  const std::string & strFileName,
                 const int16_t *     pVoxels,
                 const uint32_t      iX,
                 const uint32_t      iY,
                 const uint32_t      iZ,
-                const float         fCellSize )
+                const float         fXSpacing,
+                const float         fYSpacing,
+                const float         fZSpacing   )
 {
     bool ascii = false;
 
@@ -42,7 +45,7 @@ bool WriteVTK(  const std::string & strFileName,
 
     vtkstream << "DATASET STRUCTURED_POINTS" << std::endl;
     vtkstream << "DIMENSIONS " << iX << " " << iY << " " << iZ << std::endl;
-    vtkstream << "ASPECT_RATIO " << fCellSize << " " << fCellSize << " " << fCellSize << std::endl;
+    vtkstream << "ASPECT_RATIO " << fXSpacing << " " << fYSpacing << " " << fZSpacing << std::endl;
     vtkstream << "ORIGIN " << 0.0f << " " << 0.0f << " " << 0.0f << std::endl;
     vtkstream << "POINT_DATA " << iX*iY*iZ << std::endl;
     vtkstream << "SCALARS volume_scalars short 1" << std::endl;
@@ -57,7 +60,16 @@ bool WriteVTK(  const std::string & strFileName,
     }
     else
     {
-        vtkstream.write( reinterpret_cast<char *>(const_cast<int16_t *>(pVoxels)), iX*iY*iZ*sizeof(int16_t) );
+        //vtkstream.write( reinterpret_cast<char *>(const_cast<int16_t *>(pVoxels)), iX*iY*iZ*sizeof(int16_t) );
+
+        uint8_t * pu1 = reinterpret_cast<uint8_t *>(const_cast<int16_t *>(pVoxels));
+        for (uint32_t i = 0; i < iX*iY*iZ; i++)
+        {
+            // endian swap
+            vtkstream.write( reinterpret_cast<char *>(pu1+1), 1 );
+            vtkstream.write( reinterpret_cast<char *>(pu1), 1 );
+            pu1 += 2;
+        }
     }
 
     vtkstream.close();
@@ -147,12 +159,61 @@ bool ReadVTK(   const std::string & strFileName,
     }
     else
     {
-        vtkstream.read(reinterpret_cast<char *>(const_cast<int16_t *>(*ppVoxels)), iX*iY*iZ * sizeof(int16_t));
+        //vtkstream.read(reinterpret_cast<char *>(const_cast<int16_t *>(*ppVoxels)), iX*iY*iZ * sizeof(int16_t));
+        uint8_t * pu1 = reinterpret_cast<uint8_t *>(const_cast<int16_t *>(*ppVoxels));
+        for (uint32_t i = 0; i < iX*iY*iZ; i++)
+        {
+            // endian swap
+            vtkstream.read(reinterpret_cast<char *>(pu1 + 1), 1);
+            vtkstream.read(reinterpret_cast<char *>(pu1), 1);
+            pu1 += 2;
+        }
     }
 
     // read final character to ensure eof
     vtkstream.read(reinterpret_cast<char *>(&uc1), sizeof(int8_t));
     assert( vtkstream.eof() );
+
+    vtkstream.close();
+
+    return true;
+}
+
+bool WriteVTU(   const std::string & strFileName,
+                    const int16_t *     pVoxels,
+                    const uint32_t      iX,
+                    const uint32_t      iY,
+                    const uint32_t      iZ,
+                    const float         fXSpacing,
+                    const float         fYSpacing,
+                    const float         fZSpacing   )
+{
+    std::ofstream vtkstream;
+
+    vtkstream.open(strFileName, std::ios::out | std::ios::binary);
+
+    if (!vtkstream)
+    {
+        return false;
+    }
+
+    std::string encoded = base64_encode(reinterpret_cast<const unsigned char*>(pVoxels), iX*iY*iZ * sizeof(int16_t));
+
+    vtkstream << "<VTKFile type = \"ImageData\" version = \"1.0\" byte_order = \"LittleEndian\" header_type = \"UInt64\">\n";
+    vtkstream << "<ImageData WholeExtent = \"0 " << iX-1 << " 0 " << iY-1 << " 0 " << iZ-1 << "\"";
+    vtkstream << " Origin = \"0 0 0\"";
+    vtkstream << " Spacing = \"" << fXSpacing << " " << fYSpacing << " " << fZSpacing << "\">\n";
+    vtkstream << "<Piece Extent = \"0 " << iX-1 << " 0 " << iY-1 << " 0 " << iZ-1 << "\">\n";
+    vtkstream << "<PointData Scalars = \"my_scalars\">\n";
+    vtkstream << "<DataArray type = \"Int16\" Name = \"volume_scalars\" format = \"binary\">\n";
+    vtkstream << encoded;
+    vtkstream << "</DataArray>\n";
+    vtkstream << "</PointData>\n";
+    vtkstream << "<CellData></CellData>\n";
+    vtkstream << "</Piece>\n";
+    vtkstream << "</ImageData>\n";
+
+    vtkstream << "</VTKFile>\n";
 
     vtkstream.close();
 
