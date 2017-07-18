@@ -17,8 +17,8 @@ void writePPM( std::string & strFileName, const int16_t * pBuffer, const int dim
     for ( int i = 0; i < iNum; i++ )
     {
         const int32_t   iVal = pBuffer[i];
-        iMin = min( iMin, iVal );
-        iMax = max( iMax, iVal );
+        iMin = std::min( iMin, iVal );
+        iMax = std::max( iMax, iVal );
     }
     int16_t iScale = iMax - iMin;
 
@@ -36,8 +36,8 @@ void writePPM( std::string & strFileName, const int16_t * pBuffer, const int dim
        static unsigned char color[3];
        const int32_t   iVal = pBuffer[i];
        unsigned char cVal = static_cast<unsigned char>(((iVal - iMin) * 255) / iScale);
-       iMinP = min(iMinP, int(cVal));
-       iMaxP = max(iMaxP, int(cVal));
+       iMinP = std::min(iMinP, int(cVal));
+       iMaxP = std::max(iMaxP, int(cVal));
        color[0] = cVal; // red
        color[1] = cVal; // green
        color[2] = cVal; // blue
@@ -313,9 +313,9 @@ int16_t trilinearVoxel( const int16_t * pSrc,
     float   fX0 = float(iX0);
     float   fY0 = float(iY0);
     float   fZ0 = float(iZ0);
-    int     iX1 = min(iX0 + 1, iSizeX - 1);
-    int     iY1 = min(iY0 + 1, iSizeY - 1);
-    int     iZ1 = min(iZ0 + 1, iSizeZ - 1);
+    int     iX1 = std::min(iX0 + 1, iSizeX - 1);
+    int     iY1 = std::min(iY0 + 1, iSizeY - 1);
+    int     iZ1 = std::min(iZ0 + 1, iSizeZ - 1);
     float   fX1 = float(iX1);
     float   fY1 = float(iY1);
     float   fZ1 = float(iZ1);
@@ -484,12 +484,29 @@ void ReadDir( const std::string & strDir)
                     1.0f );
     assert(bOK);
 
+    // write test sub-cube from middle of resampled data
+    bOK = WriteVTK( "test3.vtk",
+                    piBufferDest,
+                    64,
+                    64,
+                    64,
+                    256,
+                    256,
+                    256,
+                    iDestSizeX,
+                    iDestSizeY,
+                    iDestSizeZ,
+                    1.0f,
+                    1.0f,
+                    1.0f);
+    assert(bOK);
+
     int16_t iMin = INT16_MAX;
     int16_t iMax = INT16_MIN;
     for (int i = 0; i < iSize; i++)
     {
-        iMin = min(iMin, piBufferSrc[i]);
-        iMax = max(iMax, piBufferSrc[i]);
+        iMin = std::min(iMin, piBufferSrc[i]);
+        iMax = std::max(iMax, piBufferSrc[i]);
     }
     std::cout << "Min = " << iMin << " Max = " << iMax << "\n";
 

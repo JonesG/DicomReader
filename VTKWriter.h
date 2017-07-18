@@ -2,7 +2,43 @@
 
 #include <fstream>
 #include <string>
+
+#undef min
+#undef max
+
+#include <algorithm>
+
 #include <base64.h>
+
+bool WriteVTKHeader(    std::ofstream &     vtkstream,
+                        const std::string & strFileName,
+                        const int16_t *     pVoxels,
+                        const uint32_t      iX,
+                        const uint32_t      iY,
+                        const uint32_t      iZ,
+                        const float         fXSpacing,
+                        const float         fYSpacing,
+                        const float         fZSpacing       )
+{
+    vtkstream.open(strFileName, std::ios::out | std::ios::binary);
+    if (!vtkstream)
+    {
+        return false;
+    }
+
+    vtkstream << "# vtk DataFile Version 2.0" << "\n";
+    vtkstream << "Example" << "\n";
+    vtkstream << "BINARY" << "\n";
+    vtkstream << "DATASET STRUCTURED_POINTS" << std::endl;
+    vtkstream << "DIMENSIONS " << iX << " " << iY << " " << iZ << std::endl;
+    vtkstream << "ASPECT_RATIO " << fXSpacing << " " << fYSpacing << " " << fZSpacing << std::endl;
+    vtkstream << "ORIGIN " << 0.0f << " " << 0.0f << " " << 0.0f << std::endl;
+    vtkstream << "POINT_DATA " << iX*iY*iZ << std::endl;
+    vtkstream << "SCALARS volume_scalars short 1" << std::endl;
+    vtkstream << "LOOKUP_TABLE default" << std::endl;
+
+    return true;
+}
 
 bool WriteVTK(  const std::string & strFileName,
                 const int16_t *     pVoxels,
@@ -13,62 +49,91 @@ bool WriteVTK(  const std::string & strFileName,
                 const float         fYSpacing,
                 const float         fZSpacing   )
 {
-    bool ascii = false;
-
     std::ofstream vtkstream;
 
-    if (ascii)
-    {
-        vtkstream.open(strFileName, std::ios::out);
-    }
-    else
-    {
-        vtkstream.open(strFileName, std::ios::out | std::ios::binary);
-    }
-
-    if (!vtkstream)
+    if ( !WriteVTKHeader(   vtkstream,
+                            strFileName,
+                            pVoxels,
+                            iX,
+                            iY,
+                            iZ,
+                            fXSpacing,
+                            fYSpacing,
+                            fZSpacing)  )
     {
         return false;
     }
 
-    vtkstream << "# vtk DataFile Version 2.0" << "\n";
-    vtkstream << "Example" << "\n";
+    //vtkstream.write( reinterpret_cast<char *>(const_cast<int16_t *>(pVoxels)), iX*iY*iZ*sizeof(int16_t) );
 
-    if (ascii)
+    uint8_t * pu1 = reinterpret_cast<uint8_t *>(const_cast<int16_t *>(pVoxels));
+    for (uint32_t i = 0; i < iX*iY*iZ; i++)
     {
-        vtkstream << "ASCII" << "\n";
+        // endian swap
+        vtkstream.write( reinterpret_cast<char *>(pu1+1), 1 );
+        vtkstream.write( reinterpret_cast<char *>(pu1), 1 );
+        pu1 += 2;
     }
-    else
+
+    vtkstream.close();
+
+    return true;
+}
+
+bool WriteVTK(  const std::string & strFileName,
+                const int16_t *     pVoxels,
+                const uint32_t      iX,
+                const uint32_t      iY,
+                const uint32_t      iZ,
+                const uint32_t      iOriginX,
+                const uint32_t      iOriginY,
+                const uint32_t      iOriginZ,
+                const uint32_t      iPitchX,
+                const uint32_t      iPitchY,
+                const uint32_t      iPitchZ,
+                const float         fXSpacing,
+                const float         fYSpacing,
+                const float         fZSpacing   )
+{
+    std::ofstream vtkstream;
+
+    if ( !WriteVTKHeader(   vtkstream,
+                            strFileName,
+                            pVoxels,
+                            iX,
+                            iY,
+                            iZ,
+                            fXSpacing,
+                            fYSpacing,
+                            fZSpacing))
     {
-        vtkstream << "BINARY" << "\n";
+        return false;
     }
 
-    vtkstream << "DATASET STRUCTURED_POINTS" << std::endl;
-    vtkstream << "DIMENSIONS " << iX << " " << iY << " " << iZ << std::endl;
-    vtkstream << "ASPECT_RATIO " << fXSpacing << " " << fYSpacing << " " << fZSpacing << std::endl;
-    vtkstream << "ORIGIN " << 0.0f << " " << 0.0f << " " << 0.0f << std::endl;
-    vtkstream << "POINT_DATA " << iX*iY*iZ << std::endl;
-    vtkstream << "SCALARS volume_scalars short 1" << std::endl;
-    vtkstream << "LOOKUP_TABLE default" << std::endl;
+    //vtkstream.write( reinterpret_cast<char *>(const_cast<int16_t *>(pVoxels)), iX*iY*iZ*sizeof(int16_t) );
 
-    if (ascii)
+    uint32_t    iEndX = std::min(iPitchX, iOriginX + iX);
+    uint32_t    iEndY = std::min(iPitchY, iOriginY + iY);
+    uint32_t    iEndZ = std::min(iPitchZ, iOriginZ + iZ);
+
+    for ( uint32_t i = iOriginZ; i < iEndZ; i++ )
     {
-        for (unsigned int i = 0; i<iX*iY*iZ; ++i)
+        uint32_t    iZStart = i * iPitchX * iPitchY;
+
+        for (uint32_t j = iOriginY; j < iEndY; j++)
         {
-            vtkstream << pVoxels[i] << " ";
-        }
-    }
-    else
-    {
-        //vtkstream.write( reinterpret_cast<char *>(const_cast<int16_t *>(pVoxels)), iX*iY*iZ*sizeof(int16_t) );
+            uint32_t    iYStart = j * iPitchX;
 
-        uint8_t * pu1 = reinterpret_cast<uint8_t *>(const_cast<int16_t *>(pVoxels));
-        for (uint32_t i = 0; i < iX*iY*iZ; i++)
-        {
-            // endian swap
-            vtkstream.write( reinterpret_cast<char *>(pu1+1), 1 );
-            vtkstream.write( reinterpret_cast<char *>(pu1), 1 );
-            pu1 += 2;
+            const int16_t * pStart = &pVoxels[iZStart+iYStart+ iOriginX];
+            uint8_t *       pu1 = reinterpret_cast<uint8_t *>(const_cast<int16_t *>(pStart));
+
+            for (uint32_t k = iOriginX; k < iEndX; k++)
+            {
+                // endian swap
+                vtkstream.write(reinterpret_cast<char *>(pu1 + 1), 1);
+                vtkstream.write(reinterpret_cast<char *>(pu1), 1);
+                pu1 += 2;
+            }
         }
     }
 
